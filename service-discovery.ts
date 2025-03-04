@@ -61,3 +61,45 @@ export class ServiceDiscovery {
         return this.instanceId;
     }
 }
+
+/**
+ * Creates a delay for a specified number of milliseconds
+ * @param ms - The number of milliseconds to delay (defaults to 5000ms/5 seconds)
+ * @returns A promise that resolves after the specified delay
+ */
+export const delay = (ms: number = 5000): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+interface DistributedWorkerConfigWithWorkers {
+    workers: number;
+    maxWaitTime?: undefined;
+}
+
+interface DistributedWorkerConfigWithTimeout {
+    workers?: undefined;
+    maxWaitTime: number;
+}
+
+type DistributedWorkerConfig = DistributedWorkerConfigWithWorkers | DistributedWorkerConfigWithTimeout;
+
+export async function DistributedWorker({workers, maxWaitTime = 10000}: DistributedWorkerConfig): Promise<ServiceDiscovery> {
+    const serviceDiscovery = new ServiceDiscovery();
+    await serviceDiscovery.register();
+
+    const startTime = Date.now();
+    let currentWorkers = 0;
+
+    while (currentWorkers < workers && (Date.now() - startTime) < maxWaitTime) {
+        const activeInstances = await serviceDiscovery.getActiveInstances();
+        console.log(`Instance ${serviceDiscovery.getInstanceId()} is running`);
+        console.log(`Total active instances: ${activeInstances}`);
+
+        currentWorkers = activeInstances;
+        await delay(500);
+    }
+
+    serviceDiscovery.deregister();
+
+    return serviceDiscovery;
+}
